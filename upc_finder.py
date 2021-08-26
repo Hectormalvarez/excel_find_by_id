@@ -5,29 +5,11 @@ Date   : 2021-08-21
 Purpose: Get Prices From Manufacturer
 """
 
-import argparse
 import os
-import sys
+import argparse
 from openpyxl.reader.excel import load_workbook
 
 
-def get_args():
-    """Get command-line arguments"""
-
-    parser = argparse.ArgumentParser(
-        description='Count Words',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    parser.add_argument('file',
-                        help='A readable file',
-                        nargs='*', )
-
-    args = parser.parse_args()
-
-    return args
-
-
-# --------------------------------------------------
 def get_workbook_to_search():
     files = dict(enumerate([f for f in os.listdir(os.curdir) if os.path.isfile(f) and f[-4:] == "xlsx"]))
 
@@ -71,7 +53,7 @@ def find_column(sheet_object, column_name):
                 print(str(cell.column) + ": " + str(cell.value))
             else:
                 continue
-            column_to_look_in += 1
+            column_to_look_in += 1  # look in next row if entry is still blank
 
         # ask if identifying value is listed
         is_looking_for_source_identifier = input("Enter number of Identifier(leave blank if not listed): ")
@@ -89,38 +71,43 @@ def find_column(sheet_object, column_name):
 def main():
     """Make a jazz noise here"""
 
-    args = get_args()
-
     print("Lets Find Source Worksheet")
     print("------------------------------------")
+    # unpack workbook assets from getting workbook, swo and swn to save, sso to work with
     source_workbook_object, source_sheet_object, source_workbook_name = get_workbook_to_search()
-    source_identifying_column_number = find_column(source_sheet_object, "Identifying")
-    source_list_price_column_number = find_column(source_sheet_object, "List Price")
     sso = source_sheet_object
-    sicn = source_identifying_column_number
+    source_identifying_column_number = find_column(sso, "Identifying")  # get identifying column number
+    source_list_price_column_number = find_column(sso, "List Price")  # get list price column number
+    sicn = source_identifying_column_number  # create smaller variables to make code shorter
     slpcn = source_list_price_column_number
 
     print("Lets Find Manufacturer Worksheet")
     print("------------------------------------")
+    # unpacking manufacturer values, only need mpso rest are unpacked so there's no error
     manufacturer_workbook_object, manufacturer_price_sheet_object, manufacturer_workbook_name = get_workbook_to_search()
-    manufacturer_identifying_column_number = find_column(manufacturer_price_sheet_object, "Identifying")
-    manufacturer_list_price_column_number = find_column(manufacturer_price_sheet_object, "List Price")
     mpo = manufacturer_price_sheet_object
+    manufacturer_identifying_column_number = find_column(mpo, "Identifying")  # get id column number
+    manufacturer_list_price_column_number = find_column(mpo, "List Price")  # get list price column
     mlpcn = manufacturer_list_price_column_number
     micn = manufacturer_identifying_column_number
 
     # start iterations
-    for source_identifying_column in sso.iter_cols(max_col=sicn,  # Generates column for iterating
+    for source_identifying_column in sso.iter_cols(max_col=sicn,  # Generates column from source sheet
                                                    min_col=sicn):
-        for source_cell in source_identifying_column:  # for each cell in source identifying column
-            if source_cell.value is not None:  #
-                for manufacturer_column in mpo.iter_cols(max_col=micn, min_col=micn):
-                    for manufacturer_cell in manufacturer_column:
-                        if source_cell.value == manufacturer_cell.value:
-                            mcr = manufacturer_cell.row  # row of matching manufacturer cell
-                            scr = source_cell.row  # row of matching source cell
-                            manufacturer_list_price = mpo.cell(row=mcr, column=mlpcn).value
-                            print(str(source_cell.value) + " price: " + str(mpo.cell(row=mcr, column=mlpcn).value))
+        for source_cell in source_identifying_column:  # for each cell in source sheet column
+            if source_cell.value is not None:  # if cell is empty keep going
+                # for each cell in the source sheet column we are going to go down manufacturer column to find a match
+                for manufacturer_column in mpo.iter_cols(max_col=micn, min_col=micn):  # generates comparison column from manufacturer sheet
+                    for manufacturer_cell in manufacturer_column:  # for each cell in the column we are comparing to
+                        if source_cell.value == manufacturer_cell.value:  # if the value from the source cell matches the current cell
+                            mcr = manufacturer_cell.row  # take the row of matching manufacturer cell
+                            scr = source_cell.row  # take the row of matching source cell
+
+                            # Get the value from the list price column of manufacturer sheet
+                            manufacturer_list_price = mpo.cell(row=mcr, column=mlpcn).value 
+                            # Prints the identifier cell that was matched, and price that was extracted
+                            print(str(source_cell.value) + " price: " + manufacturer_list_price)
+                            # set value of list price in source sheet list price column for row being searched
                             sso.cell(row=scr, column=slpcn).value = manufacturer_list_price
                         else:
                             continue
@@ -128,7 +115,7 @@ def main():
                 continue
 
         print("Done Updating!")
-        source_workbook_object.save(source_workbook_name)
+        source_workbook_object.save(source_workbook_name)  # update the workbook
 
 
 # --------------------------------------------------
